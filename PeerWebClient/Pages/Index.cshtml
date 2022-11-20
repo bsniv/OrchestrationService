@@ -30,18 +30,15 @@
     </style>
 </head>
 <body>
-    <h1>WebSocket Sample Application</h1>
+    <h1>Overlay Network Listener</h1>
     <p id="stateLabel">Ready to connect...</p>
     <div>
-        <label for="connectionUrl">TenantName:</label>
-        <input id="connectionUrl" />
+        <label for="tenantName">TenantName:</label>
+        <input id="tenantName" />
         <button id="connectButton" type="submit">Connect</button>
     </div>
     <p></p>
     <div>
-        <label for="sendMessage">Message to send:</label>
-        <input id="sendMessage" disabled />
-        <button id="sendButton" type="submit" disabled>Send</button>
         <button id="closeButton" disabled>Close Socket</button>
     </div>
 
@@ -59,32 +56,26 @@
     </table>
 
     <script>
-        var connectionUrl = document.getElementById("connectionUrl");
+        var tenantName = document.getElementById("tenantName");
         var connectButton = document.getElementById("connectButton");
         var stateLabel = document.getElementById("stateLabel");
-        var sendMessage = document.getElementById("sendMessage");
-        var sendButton = document.getElementById("sendButton");
         var commsLog = document.getElementById("commsLog");
         var closeButton = document.getElementById("closeButton");
         var socket;
 
         var scheme = document.location.protocol === "https:" ? "wss" : "ws";
 
-        var connectionUrlValue = scheme + "://" + document.location.hostname + ":51443" + "/WebSocket?tenantName=";
+        var connectionUrl = scheme + "://" + document.location.hostname + ":51443" + "/WebSocket?tenantName=";
 
         function updateState() {
             function disable() {
-                sendMessage.disabled = true;
-                sendButton.disabled = true;
                 closeButton.disabled = true;
             }
             function enable() {
-                sendMessage.disabled = false;
-                sendButton.disabled = false;
                 closeButton.disabled = false;
             }
 
-            connectionUrl.disabled = true;
+            tenantName.disabled = true;
             connectButton.disabled = true;
 
             if (!socket) {
@@ -94,7 +85,7 @@
                     case WebSocket.CLOSED:
                         stateLabel.innerHTML = "Closed";
                         disable();
-                        connectionUrl.disabled = false;
+                        tenantName.disabled = false;
                         connectButton.disabled = false;
                         break;
                     case WebSocket.CLOSING:
@@ -124,21 +115,9 @@
             socket.close(1000, "Closing from client");
         };
 
-        sendButton.onclick = function () {
-            if (!socket || socket.readyState !== WebSocket.OPEN) {
-                alert("socket not connected");
-            }
-            var data = sendMessage.value;
-            socket.send(data);
-            commsLog.innerHTML += '<tr>' +
-                '<td class="commslog-client">Client</td>' +
-                '<td class="commslog-server">Server</td>' +
-                '<td class="commslog-data">' + htmlEscape(data) + '</td></tr>';
-        };
-
         connectButton.onclick = function() {
             stateLabel.innerHTML = "Connecting";
-            socket = new WebSocket(connectionUrlValue + connectionUrl.value);
+            socket = new WebSocket(connectionUrl + tenantName.value);
             socket.onopen = function (event) {
                 updateState();
                 commsLog.innerHTML += '<tr>' +

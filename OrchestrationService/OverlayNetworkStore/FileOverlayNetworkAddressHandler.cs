@@ -1,4 +1,5 @@
 ﻿using OrchestrationService.Contracts;
+using OrchestrationService.Logger;
 using OrchestrationService.OverlayNetworkStore.Exceptions;
 using System.Net;
 using System.Text.Json;
@@ -10,6 +11,7 @@ public class FileOverlayNetworkAddressHandler
     public FileOverlayNetworkAddressHandler(string rootPath, Subnet subnet)
     {
         _subnet = subnet;
+        _logger = OverlayNetworkLoggerProvider.GetLogger(nameof(FileOverlayNetworkAddressHandler));
         _addressesPath = Path.Combine(rootPath, "addresses");
 
         Directory.CreateDirectory(_addressesPath);
@@ -17,15 +19,18 @@ public class FileOverlayNetworkAddressHandler
 
     public void DeleteKnownAddress(int[] address)
     {
+        _logger.LogInformation($"{nameof(DeleteKnownAddress)}:Deleting address: {JsonSerializer.Serialize(address)}, tenantName: {_subnet.TenantName}");
         var addressFullPath = Path.Combine(GetScopedPath(address, 3), $"{address[3]}.json");
         File.Delete(addressFullPath);
     }
 
     public async Task<Peer?> GetPeerAsync(int[] address)
     {
+        _logger.LogInformation($"{nameof(GetPeerAsync)}: Getting peer: {JsonSerializer.Serialize(address)}, tenantName: {_subnet.TenantName}");
         var addressFullPath = Path.Combine(GetScopedPath(address, 3), $"{address[3]}.json");
         if (!File.Exists(addressFullPath))
         {
+            _logger.LogInformation($"{nameof(GetPeerAsync)}: peer not found: {JsonSerializer.Serialize(address)}, tenantName: {_subnet.TenantName}");
             throw new PeerNotFoundException($"Could not find the following address, {string.Join('.', address)}");
         }
 
@@ -40,6 +45,7 @@ public class FileOverlayNetworkAddressHandler
 
     public async Task<bool> AssignKnownAddressAsync(int[]? address, Peer peer)
     {
+        _logger.LogInformation($"{nameof(AssignKnownAddressAsync)}: Assigning known address to peer: {JsonSerializer.Serialize(address)}, tenantName: {_subnet.TenantName}");
         // parse the address into a desired path
         var addressFullPath = Path.Combine(GetScopedPath(address, 3), $"{address[3]}.json");
 
@@ -59,6 +65,8 @@ public class FileOverlayNetworkAddressHandler
     /// <returns>A bool specifying whether the action succeeded or not & the address in case of success</returns>
     public (bool, int[]?) FindNewAddress()
     {
+        _logger.LogInformation($"{nameof(FindNewAddress)}: Finding a new address to peer, tenantName: {_subnet.TenantName}");
+
         var minAddress = (int[])_subnet.MinAddress.Clone();
         var rootPath = GetScopedPath(minAddress, _subnet.AddressSpace / 8);
         Directory.CreateDirectory(rootPath);
@@ -67,17 +75,29 @@ public class FileOverlayNetworkAddressHandler
     }
 
 
-    private (bool, int[]?) FindNewAddressInternal(int[] scope, int depth)
+    private (bool, int[]?) FindNewAddressInternal(int[] scope, int depth, string parentCorrelationId = "")
     {
+        // Creating a correlation id for logging
+        var correlationId = Guid.NewGuid().ToString();
+        _logger.LogTrace($"{nameof(FindNewAddressInternal)}: Finding a new address to peer, " +
+            $"{nameof(scope)}: {scope}, {nameof(depth)}: {depth}, {nameof(correlationId)}: {correlationId}," +
+            $"{nameof(parentCorrelationId)}: {parentCorrelationId}, {_subnet.TenantName}");
+
         if (depth == 3)
         {
-            var path = GetScopedPath(scope, 3); //Path.Combine(_storePath, $"{scope[0]}", $"{scope[1]}", $"{scope[2]}");
+            var path = GetScopedPath(scope, 3);
             Directory.CreateDirectory(path);
-            (var success, var selectedAddressSuffix) = CheckAvailableAddressFileInFolderAsync(path);
+            (var success, var selectedAddressSuffix) = CheckAvailableAddressFileInFolderAsync(path, correlationId);
             if (success)
             {
                 scope[3] = selectedAddressSuffix;
                 return (success, scope);
+            }
+
+            // If we're at min depth, this means that we're at a leaf and that we have dug all possibilties..
+            if (depth == _subnet.AddressSpace / 8)
+            {
+                throw new SubnetIsFullException();
             }
 
             return (false, null);
@@ -105,9 +125,15 @@ public class FileOverlayNetworkAddressHandler
         {
             // Combine it to 10.0.4, 5, 6 etc...
             scope[depth] = i;
-            (var success, var alloctedSuffix) = FindNewAddressInternal(scope, depth + 1);
+            _logger.LogTrace($"{nameof(FindNewAddressInternal)}: Digging deeper in depth, " +
+                $"{nameof(scope)}: {scope}, {nameof(depth)}: {depth}, {nameof(correlationId)}: {correlationId}," +
+                $"{nameof(parentCorrelationId)}: {parentCorrelationId}, {_subnet.TenantName}");
+            (var success, var alloctedSuffix) = FindNewAddressInternal(scope, depth + 1, correlationId);
             if (success)
             {
+                _logger.LogTrace($"{nameof(FindNewAddressInternal)}: Found an address suffix which is free! {alloctedSuffix} " +
+                    $"{nameof(scope)}: {scope}, {nameof(depth)}: {depth}, {nameof(correlationId)}: {correlationId}," +
+                    $"{nameof(parentCorrelationId)}: {parentCorrelationId}, {_subnet.TenantName}");
                 return (true, alloctedSuffix);
             }
         }
@@ -136,8 +162,9 @@ public class FileOverlayNetworkAddressHandler
     /// </summary>
     /// <param name="scope">The path to the directory representing the current scope. e.g. C:/10.0.0</param>
     /// <returns></returns>
-    private (bool, int) CheckAvailableAddressFileInFolderAsync(string scope)
+    private (bool, int) CheckAvailableAddressFileInFolderAsync(string scope, string correlationId)
     {
+        _logger.LogTrace($"{nameof(CheckAvailableAddressFileInFolderAsync)}: Finding a new address to peer, {nameof(scope)}: {scope}, {nameof(correlationId)}: {correlationId}, {_subnet.TenantName}");
         var files = Directory.GetFiles(scope);
         if (files.Length == 127)
         {
@@ -158,6 +185,10 @@ public class FileOverlayNetworkAddressHandler
         // Get all possible addresses in the given scope, at most 255 addresses.
         var allAddressInScope = Enumerable.Range(minAddressSuffix, Math.Min(255, minAddressSuffix + _subnet.NumberOfAddresses));
         var availableAddresses = allAddressInScope.Where(add => !allAddressesInUse.Contains(add));
+
+        _logger.LogTrace($"{nameof(CheckAvailableAddressFileInFolderAsync)}: Finding a new address to peer, {nameof(scope)}: {scope}, " +
+            $"{nameof(availableAddresses)}Count: {availableAddresses.Count()}" +
+            $"{nameof(correlationId)}: {correlationId}, {_subnet.TenantName}");
         if (!availableAddresses.Any())
         {
             return (false, -1);
@@ -171,4 +202,5 @@ public class FileOverlayNetworkAddressHandler
 
     private readonly string _addressesPath;
     private readonly Subnet _subnet;
+    private readonly ILogger _logger;
 }

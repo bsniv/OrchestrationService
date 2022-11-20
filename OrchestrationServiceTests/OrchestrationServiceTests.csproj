@@ -17,7 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\OrchestrationService\OrchestrationService\OrchestrationService.csproj" />
+    <ProjectReference Include="..\OrchestrationService\OrchestrationService.csproj" />
   </ItemGroup>
 
 </Project>

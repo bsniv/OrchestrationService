@@ -15,16 +15,16 @@ namespace OrchestrationService.Controllers;
 [Route("[controller]")]
 public class WebSocketController : ControllerBase
 {
-    private readonly IOverlayNetworkStore _overlayNetworkStore;
-
-    public WebSocketController()
+    public WebSocketController(ILogger<WebSocketController> logger)
     {
         _overlayNetworkStore = FileOverlayNetworkStoreFactory.GetOrCreateStore();
+        _logger = logger;
     }
 
     [HttpGet(Name = "GetWebSocket")]
-    public async Task<ActionResult> Get(string tenantName)
+    public async Task<ActionResult> GetWebSocket(string tenantName)
     {
+        _logger.LogInformation($"{nameof(GetWebSocket)}: new request received: {nameof(tenantName)}:{tenantName}");
         Subnet subnet;
         try
         {
@@ -32,6 +32,7 @@ public class WebSocketController : ControllerBase
         }
         catch (SubnetNotFoundException e)
         {
+            _logger.LogInformation($"{nameof(GetWebSocket)}: Could not find the following subet: {tenantName}");
             return NotFound(e.Message);
         }
 
@@ -39,18 +40,19 @@ public class WebSocketController : ControllerBase
         {
             using var webSocket = await HttpContext.WebSockets.AcceptWebSocketAsync();
             WebSocketNotifier.AddClient(tenantName, webSocket);
-            
-            await Echo(webSocket);
+            await WaitForCloseSignal(webSocket);
+            _logger.LogInformation($"{nameof(GetWebSocket)}: Successfully initialized a web socket connection and added the client: {tenantName}");
         }
         else
         {
+            _logger.LogInformation($"{nameof(GetWebSocket)}: Received a non web socket request: {tenantName}");
             return BadRequest("Expected to be web socket request");
         }
 
         return Ok();
     }
 
-    private static async Task Echo(WebSocket webSocket)
+    private static async Task WaitForCloseSignal(WebSocket webSocket)
     {
         var buffer = new byte[1024 * 4];
         var receiveResult = await webSocket.ReceiveAsync(
@@ -58,12 +60,6 @@ public class WebSocketController : ControllerBase
 
         while (!receiveResult.CloseStatus.HasValue)
         {
-            await webSocket.SendAsync(
-                new ArraySegment<byte>(buffer, 0, receiveResult.Count),
-                receiveResult.MessageType,
-                receiveResult.EndOfMessage,
-                CancellationToken.None);
-
             receiveResult = await webSocket.ReceiveAsync(
                 new ArraySegment<byte>(buffer), CancellationToken.None);
         }
@@ -73,4 +69,7 @@ public class WebSocketController : ControllerBase
             receiveResult.CloseStatusDescription,
             CancellationToken.None);
     }
+
+    private readonly ILogger<WebSocketController> _logger;
+    private readonly IOverlayNetworkStore _overlayNetworkStore;
 }

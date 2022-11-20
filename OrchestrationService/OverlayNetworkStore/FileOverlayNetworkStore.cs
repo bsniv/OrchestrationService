@@ -4,11 +4,10 @@ namespace OrchestrationService.OverlayNetworkStore;
 
 public class FileOverlayNetworkStore : IOverlayNetworkStore
 {
-    public FileOverlayNetworkStore()// ILogger<FileOverlayNetworkStore> logger)
+    public FileOverlayNetworkStore()
     {
         _addressStore = new FileOverlayNetworkAddressStore();
         _subnetStore = new FileOverlayNetworkSubnetStore();
-        // _logger = logger;
     }
 
     public async Task<bool> FindAndAssignNewAddress(Subnet subnet, Peer peer)

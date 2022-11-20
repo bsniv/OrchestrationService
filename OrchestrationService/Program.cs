@@ -1,3 +1,5 @@
+using OrchestrationService.Logger;
+
 namespace OrchestrationService
 {
     public class Program
@@ -14,6 +16,12 @@ namespace OrchestrationService
             builder.Services.AddSwaggerGen();
 
             var app = builder.Build();
+
+            var loggerFactory = LoggerFactory.Create(config =>
+            {
+                config.AddConsole();
+            });
+            OverlayNetworkLoggerProvider.Init(loggerFactory);
 
             // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())

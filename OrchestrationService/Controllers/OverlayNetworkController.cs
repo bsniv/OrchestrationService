@@ -10,9 +10,6 @@ namespace OrchestrationService.Controllers
     [Route("[controller]")]
     public class OverlayNetworkController : ControllerBase
     {
-        private readonly ILogger<PeerClientController> _logger;
-        private readonly IOverlayNetworkStore _overlayNetworkStore;
-
         public OverlayNetworkController(ILogger<PeerClientController> logger)
         {
             _logger = logger;
@@ -22,6 +19,7 @@ namespace OrchestrationService.Controllers
         [HttpPost(Name = "CreateNewNetwork")]
         public async Task<ActionResult<Subnet>> CreateNewNetwork(string tenantName, string minAddress, int addressSpace)
         {
+            _logger.LogInformation($"{nameof(CreateNewNetwork)}: new request received with params: {nameof(tenantName)}:{tenantName}, {nameof(minAddress)}:{minAddress}, {nameof(addressSpace)}:{addressSpace}");
             var subnet = new Subnet(tenantName, minAddress, addressSpace);
 
             try
@@ -29,16 +27,22 @@ namespace OrchestrationService.Controllers
                 var success = await _overlayNetworkStore.WriteSubnetMetadataToDb(subnet);
                 if (success)
                 {
+                    _logger.LogInformation($"{nameof(CreateNewNetwork)}: new request received with params: {nameof(tenantName)}:{tenantName}, {nameof(minAddress)}:{minAddress}, {nameof(addressSpace)}:{addressSpace} finished with success");
                     return CreatedAtAction(nameof(CreateNewNetwork), subnet, subnet);
                 }
             }
             catch (SubnetAlreadyExistsException e)
             {
+                _logger.LogInformation($"{nameof(CreateNewNetwork)}: new request received with params: {nameof(tenantName)}:{tenantName} failed, found an existing subnet");
                 return Conflict(e.Message);
             }
 
+            _logger.LogError($"{nameof(CreateNewNetwork)}: new request received with params: {nameof(tenantName)}:{tenantName} failed, unmapped issue");
             // TODO:// more implicative error handling.
             return BadRequest("Couldn't write subnet to db");
         }
+
+        private readonly ILogger<PeerClientController> _logger;
+        private readonly IOverlayNetworkStore _overlayNetworkStore;
     }
 }
