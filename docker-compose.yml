@@ -1,0 +1,15 @@
+version: '3.4'
+
+services:
+  orchestrationservice:
+    image: ${DOCKER_REGISTRY-}orchestrationservice
+    build:
+      context: .
+      dockerfile: OrchestrationService/Dockerfile
+
+  peerwebclient:
+    image: ${DOCKER_REGISTRY-}peerwebclient
+    build:
+      context: .
+      dockerfile: PeerWebClient/Dockerfile
+      

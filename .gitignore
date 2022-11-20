@@ -1,0 +1,6 @@
+**/bin/**
+**/obj/**
+**/FileContentIndx/**
+**/DesignTimeBuild/**
+.vs/**
+**/WireguardDb
