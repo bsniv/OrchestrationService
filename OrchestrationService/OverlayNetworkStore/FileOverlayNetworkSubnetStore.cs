@@ -23,7 +23,7 @@ public class FileOverlayNetworkSubnetStore
 
         if (File.Exists(subnetFullPath))
         {
-            _logger.LogInformation($"{nameof(WriteSubnetMetadataToDb)}: Could not find write subnet since it already exists: {subnet.TenantName}, {nameof(subnetFullPath)}: {subnetFullPath}");
+            _logger.LogInformation($"{nameof(WriteSubnetMetadataToDb)}: Could not write subnet since it already exists: {subnet.TenantName}, {nameof(subnetFullPath)}: {subnetFullPath}");
             throw new SubnetAlreadyExistsException("Subnet already exists");
         }
 

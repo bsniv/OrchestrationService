@@ -166,7 +166,7 @@ public class FileOverlayNetworkAddressHandler
     {
         _logger.LogTrace($"{nameof(CheckAvailableAddressFileInFolderAsync)}: Finding a new address to peer, {nameof(scope)}: {scope}, {nameof(correlationId)}: {correlationId}, {_subnet.TenantName}");
         var files = Directory.GetFiles(scope);
-        if (files.Length == 127)
+        if (files.Length == 255)
         {
             return (false, -1);
         }

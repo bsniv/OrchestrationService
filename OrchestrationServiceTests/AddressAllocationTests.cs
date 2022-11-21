@@ -1,4 +1,6 @@
+using Microsoft.Extensions.Logging;
 using OrchestrationService.Contracts;
+using OrchestrationService.Logger;
 using OrchestrationService.OverlayNetworkStore;
 using OrchestrationService.OverlayNetworkStore.Exceptions;
 using Xunit.Sdk;
@@ -8,6 +10,16 @@ namespace OrchestrationServiceTests;
 [TestClass]
 public class AddressAllocationTests
 {
+    [TestInitialize]
+    public async Task SetUp()
+    {
+        var loggerFactory = LoggerFactory.Create(config =>
+        {
+            config.AddConsole();
+        });
+        OverlayNetworkLoggerProvider.Init(loggerFactory);
+    }
+
     [TestMethod]
     public async Task SimpleAssignment_EasySpaceDvidies()
     {
@@ -96,6 +108,83 @@ public class AddressAllocationTests
         }
 
         await Assert.ThrowsExceptionAsync<SubnetIsFullException>(() => store.FindAndAssignNewAddressAsync(subnet, new Peer()));
+    }
+
+    [TestMethod]
+    public async Task MultipleAssignments_FullSuffix_ShouldContinueDfs()
+    {
+        var startingAddress = new int[]
+        {
+            10, 0, 0, 0
+        };
+
+        var subnet = new Subnet(Guid.NewGuid().ToString(), startingAddress, 16);
+        var store = new FileOverlayNetworkAddressStore();
+        bool success;
+        Peer peer;
+        for (var i = 0; i < 260; i++)
+        {
+            peer = new Peer();
+            success = await store.FindAndAssignNewAddressAsync(subnet, peer);
+            Assert.IsTrue(success);
+        }
+
+        peer = new Peer();
+        success = await store.FindAndAssignNewAddressAsync(subnet, peer);
+        Assert.AreEqual(peer.PrivateIp[2], 1);
+    }
+
+    [TestMethod]
+    public async Task SimpleDelete_ShouldRemoveTheAllocation()
+    {
+        var startingAddress = new int[]
+        {
+            10, 0, 0, 0
+        };
+
+        var subnet = new Subnet("tenant1", startingAddress, 24);
+        var peer = new Peer()
+        {
+            Token = "a"
+        };
+        var store = new FileOverlayNetworkAddressStore();
+        var success = await store.FindAndAssignNewAddressAsync(subnet, peer);
+        Assert.IsNotNull(peer.PrivateIp);
+        Assert.IsTrue(success);
+
+        success = await store.DeletePeerAsync(subnet, peer.PrivateIp, peer.Token);
+        Assert.IsTrue(success);
+    }
+
+    [TestMethod]
+    public async Task DeleteWithInvalidToken_ShouldAbortTheDeletion()
+    {
+        var startingAddress = new int[]
+        {
+            10, 0, 0, 0
+        };
+
+        var subnet = new Subnet("tenant1", startingAddress, 24);
+        var peer = new Peer()
+        {
+            Token = "a"
+        };
+        var store = new FileOverlayNetworkAddressStore();
+        var success = await store.FindAndAssignNewAddressAsync(subnet, peer);
+        Assert.IsNotNull(peer.PrivateIp);
+        Assert.IsTrue(success);
+
+        var exceptionEncountered = false;
+        try
+        {
+            await store.DeletePeerAsync(subnet, peer.PrivateIp, "b");
+        }
+        catch (TokenMismatchException e)
+        {
+            exceptionEncountered = true;
+        }
+
+        Assert.IsTrue(exceptionEncountered);
     }
 
     [TestCleanup]
