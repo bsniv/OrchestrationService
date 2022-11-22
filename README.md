@@ -1,6 +1,8 @@
 # Orchestration Service
 This service is in charge of managing subnets, allocating and deallocating private ips.
 
+Currently offboarding is done through Api call, I've not implemented a TTL mechanism which can timeout to offboard clients.
+
 # Infra
 The service is based on Net 6.0 and written in C#. It is running on top of linux containers, and can be deployed easily through docker.
 The following Apis were created:
