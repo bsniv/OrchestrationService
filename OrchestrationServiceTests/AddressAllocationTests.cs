@@ -3,6 +3,7 @@ using OrchestrationService.Contracts;
 using OrchestrationService.Logger;
 using OrchestrationService.OverlayNetworkStore;
 using OrchestrationService.OverlayNetworkStore.Exceptions;
+using OrchestrationService.OverlayNetworkStore.DbClient;
 using Xunit.Sdk;
 
 namespace OrchestrationServiceTests;
@@ -18,6 +19,7 @@ public class AddressAllocationTests
             config.AddConsole();
         });
         OverlayNetworkLoggerProvider.Init(loggerFactory);
+        _dbClient = _dbClient ?? new DiskDbClient();
     }
 
     [TestMethod]
@@ -30,7 +32,7 @@ public class AddressAllocationTests
 
         var subnet = new Subnet("tenant1", startingAddress, 24);
         var peer = new Peer();
-        var store = new FileOverlayNetworkAddressStore();
+        var store = new FileOverlayNetworkAddressStore(_dbClient);
         var success = await store.FindAndAssignNewAddressAsync(subnet, peer);
         Assert.IsNotNull(peer.PrivateIp);
         Assert.IsTrue(success);
@@ -46,7 +48,7 @@ public class AddressAllocationTests
 
         var subnet = new Subnet("tenant1", startingAddress, 24);
         var peer = new Peer();
-        var store = new FileOverlayNetworkAddressStore();
+        var store = new FileOverlayNetworkAddressStore(_dbClient);
         var success = await store.FindAndAssignNewAddressAsync(subnet, peer);
         Assert.IsNotNull(peer.PrivateIp);
         Assert.IsTrue(success);
@@ -62,7 +64,7 @@ public class AddressAllocationTests
 
         var subnet = new Subnet("tenant1", startingAddress, 22);
         var peer = new Peer();
-        var store = new FileOverlayNetworkAddressStore();
+        var store = new FileOverlayNetworkAddressStore(_dbClient);
         var success = await store.FindAndAssignNewAddressAsync(subnet, peer);
         Assert.IsNotNull(peer.PrivateIp);
         Assert.IsTrue(success);
@@ -78,7 +80,7 @@ public class AddressAllocationTests
 
         var subnet = new Subnet("tenant1", startingAddress, 24);
         var peer1 = new Peer();
-        var store = new FileOverlayNetworkAddressStore();
+        var store = new FileOverlayNetworkAddressStore(_dbClient);
         var success = await store.FindAndAssignNewAddressAsync(subnet, peer1);
         Assert.IsTrue(success);
         Assert.IsNotNull(peer1.PrivateIp);
@@ -98,7 +100,7 @@ public class AddressAllocationTests
         };
 
         var subnet = new Subnet(Guid.NewGuid().ToString(), startingAddress, 30);
-        var store = new FileOverlayNetworkAddressStore();
+        var store = new FileOverlayNetworkAddressStore(_dbClient);
         bool success;
         for (var i=0; i<4; i++)
         {
@@ -119,7 +121,7 @@ public class AddressAllocationTests
         };
 
         var subnet = new Subnet(Guid.NewGuid().ToString(), startingAddress, 16);
-        var store = new FileOverlayNetworkAddressStore();
+        var store = new FileOverlayNetworkAddressStore(_dbClient);
         bool success;
         Peer peer;
         for (var i = 0; i < 260; i++)
@@ -147,7 +149,7 @@ public class AddressAllocationTests
         {
             Token = "a"
         };
-        var store = new FileOverlayNetworkAddressStore();
+        var store = new FileOverlayNetworkAddressStore(_dbClient);
         var success = await store.FindAndAssignNewAddressAsync(subnet, peer);
         Assert.IsNotNull(peer.PrivateIp);
         Assert.IsTrue(success);
@@ -169,7 +171,7 @@ public class AddressAllocationTests
         {
             Token = "a"
         };
-        var store = new FileOverlayNetworkAddressStore();
+        var store = new FileOverlayNetworkAddressStore(_dbClient);
         var success = await store.FindAndAssignNewAddressAsync(subnet, peer);
         Assert.IsNotNull(peer.PrivateIp);
         Assert.IsTrue(success);
@@ -193,4 +195,6 @@ public class AddressAllocationTests
         var dbPath = Path.Combine(Directory.GetCurrentDirectory(), "WireguardDb");
         Directory.Delete(dbPath, true);
     }
+
+    private IDbClient _dbClient;
 }

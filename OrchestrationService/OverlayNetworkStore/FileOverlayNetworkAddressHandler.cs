@@ -1,5 +1,6 @@
 ﻿using OrchestrationService.Contracts;
 using OrchestrationService.Logger;
+using OrchestrationService.OverlayNetworkStore.DbClient;
 using OrchestrationService.OverlayNetworkStore.Exceptions;
 using System.Net;
 using System.Text.Json;
@@ -8,13 +9,14 @@ namespace OrchestrationService.OverlayNetworkStore;
 
 public class FileOverlayNetworkAddressHandler
 {
-    public FileOverlayNetworkAddressHandler(string rootPath, Subnet subnet)
+    public FileOverlayNetworkAddressHandler(string tenantName, Subnet subnet, IDbClient dbClient)
     {
+        _dbClient = dbClient;
         _subnet = subnet;
         _logger = OverlayNetworkLoggerProvider.GetLogger(nameof(FileOverlayNetworkAddressHandler));
-        _addressesPath = Path.Combine(rootPath, "addresses");
-
-        Directory.CreateDirectory(_addressesPath);
+        var tenantDirectory = _dbClient.GeneratePathInDb(tenantName);
+        _addressesPath = _dbClient.AddExtensionToPath(tenantDirectory, "addresses");
+        _dbClient.InitDirectory(_addressesPath);
     }
 
     public void DeleteKnownAddress(int[] address)
@@ -27,32 +29,26 @@ public class FileOverlayNetworkAddressHandler
     public async Task<Peer?> GetPeerAsync(int[] address)
     {
         _logger.LogInformation($"{nameof(GetPeerAsync)}: Getting peer: {JsonSerializer.Serialize(address)}, tenantName: {_subnet.TenantName}");
-        var addressFullPath = Path.Combine(GetScopedPath(address, 3), $"{address[3]}.json");
-        if (!File.Exists(addressFullPath))
+        var addressFullPath = _dbClient.AddExtensionToPath(GetScopedPath(address, 3), $"{address[3]}.json");
+        if (!_dbClient.FileExists(addressFullPath))
         {
             _logger.LogInformation($"{nameof(GetPeerAsync)}: peer not found: {JsonSerializer.Serialize(address)}, tenantName: {_subnet.TenantName}");
             throw new PeerNotFoundException($"Could not find the following address, {string.Join('.', address)}");
         }
 
-
-        using (var r = new StreamReader(addressFullPath))
-        {
-            var text = await r.ReadToEndAsync();
-            return JsonSerializer.Deserialize<Peer>(text);
-
-        }
+        var text = await _dbClient.ReadFromFileAsync(addressFullPath);    
+        return JsonSerializer.Deserialize<Peer>(text);
     }
 
-    public async Task<bool> AssignKnownAddressAsync(int[]? address, Peer peer)
+    public async Task<bool> AssignKnownAddressAsync(int[] address, Peer peer)
     {
         _logger.LogInformation($"{nameof(AssignKnownAddressAsync)}: Assigning known address to peer: {JsonSerializer.Serialize(address)}, tenantName: {_subnet.TenantName}");
         // parse the address into a desired path
-        var addressFullPath = Path.Combine(GetScopedPath(address, 3), $"{address[3]}.json");
+        var addressFullPath = _dbClient.AddExtensionToPath(GetScopedPath(address, 3), $"{address[3]}.json");
 
-        if (!File.Exists(addressFullPath))
+        if (!_dbClient.FileExists(addressFullPath))
         {
-            await File.WriteAllTextAsync(addressFullPath, JsonSerializer.Serialize(peer));
-            return true;
+            return await _dbClient.WriteFileAsync(addressFullPath, JsonSerializer.Serialize(peer));
         }
 
         return false;
@@ -69,7 +65,7 @@ public class FileOverlayNetworkAddressHandler
 
         var minAddress = (int[])_subnet.MinAddress.Clone();
         var rootPath = GetScopedPath(minAddress, _subnet.AddressSpace / 8);
-        Directory.CreateDirectory(rootPath);
+        _dbClient.InitDirectory(rootPath);
 
         return FindNewAddressInternal(minAddress, _subnet.AddressSpace / 8);
     }
@@ -86,7 +82,7 @@ public class FileOverlayNetworkAddressHandler
         if (depth == 3)
         {
             var path = GetScopedPath(scope, 3);
-            Directory.CreateDirectory(path);
+            _dbClient.InitDirectory(path);
             (var success, var selectedAddressSuffix) = CheckAvailableAddressFileInFolderAsync(path, correlationId);
             if (success)
             {
@@ -152,7 +148,7 @@ public class FileOverlayNetworkAddressHandler
         var currentPath = _addressesPath;
         for (int i = 0; i < depth; i++)
         {
-            currentPath = Path.Combine(currentPath, $"{scope[i]}");
+            currentPath = _dbClient.AddExtensionToPath(currentPath, $"{scope[i]}");
         }
         return currentPath;
     }
@@ -165,8 +161,8 @@ public class FileOverlayNetworkAddressHandler
     private (bool, int) CheckAvailableAddressFileInFolderAsync(string scope, string correlationId)
     {
         _logger.LogTrace($"{nameof(CheckAvailableAddressFileInFolderAsync)}: Finding a new address to peer, {nameof(scope)}: {scope}, {nameof(correlationId)}: {correlationId}, {_subnet.TenantName}");
-        var files = Directory.GetFiles(scope);
-        if (files.Length == 255)
+        var files = _dbClient.ListFiles(scope);
+        if (files.Count() == 255)
         {
             return (false, -1);
         }
@@ -203,4 +199,6 @@ public class FileOverlayNetworkAddressHandler
     private readonly string _addressesPath;
     private readonly Subnet _subnet;
     private readonly ILogger _logger;
+    private readonly IDbClient _dbClient;
+
 }

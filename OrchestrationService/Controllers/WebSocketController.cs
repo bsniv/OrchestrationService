@@ -17,7 +17,7 @@ public class WebSocketController : ControllerBase
 {
     public WebSocketController(ILogger<WebSocketController> logger)
     {
-        _overlayNetworkStore = FileOverlayNetworkStoreFactory.GetOrCreateStore();
+        _overlayNetworkStore = FileOverlayNetworkStoreFactory.GetOrCreateDiskStore();
         _logger = logger;
     }
 

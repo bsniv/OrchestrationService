@@ -1,13 +1,14 @@
 ﻿using OrchestrationService.Contracts;
+using OrchestrationService.OverlayNetworkStore.DbClient;
 
 namespace OrchestrationService.OverlayNetworkStore;
 
 public class FileOverlayNetworkStore : IOverlayNetworkStore
 {
-    public FileOverlayNetworkStore()
+    public FileOverlayNetworkStore(IDbClient dbClient)
     {
-        _addressStore = new FileOverlayNetworkAddressStore();
-        _subnetStore = new FileOverlayNetworkSubnetStore();
+        _addressStore = new FileOverlayNetworkAddressStore(dbClient);
+        _subnetStore = new FileOverlayNetworkSubnetStore(dbClient);
     }
 
     public async Task<bool> FindAndAssignNewAddress(Subnet subnet, Peer peer)

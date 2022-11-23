@@ -13,7 +13,7 @@ namespace OrchestrationService.Controllers
         public OverlayNetworkController(ILogger<PeerClientController> logger)
         {
             _logger = logger;
-            _overlayNetworkStore = FileOverlayNetworkStoreFactory.GetOrCreateStore();
+            _overlayNetworkStore = FileOverlayNetworkStoreFactory.GetOrCreateDiskStore();
         }
 
         [HttpPost(Name = "CreateNewNetwork")]

@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Http;
 using OrchestrationService.Contracts;
 using OrchestrationService.Logger;
+using OrchestrationService.OverlayNetworkStore.DbClient;
 using OrchestrationService.OverlayNetworkStore.Exceptions;
 using System.Collections.Concurrent;
 using System.Text.Json;
@@ -10,10 +11,11 @@ namespace OrchestrationService.OverlayNetworkStore;
 
 public  class FileOverlayNetworkAddressStore
 {
-    public FileOverlayNetworkAddressStore()
+    public FileOverlayNetworkAddressStore(IDbClient dbClient)
     {
         _addressHandlers = new ConcurrentDictionary<string, FileOverlayNetworkAddressHandler>();
         _logger = OverlayNetworkLoggerProvider.GetLogger(nameof(FileOverlayNetworkAddressStore));
+        _dbClient = dbClient;
     }
 
 
@@ -25,8 +27,7 @@ public  class FileOverlayNetworkAddressStore
     public async Task<bool> FindAndAssignNewAddressAsync(Subnet subnet, Peer peer)
     {
         _logger.LogInformation($"{nameof(FindAndAssignNewAddressAsync)}: Finding a new address to peer, tenantName: {subnet.TenantName}");
-        var storePath = Path.Combine(Directory.GetCurrentDirectory(), "WireguardDb", subnet.TenantName);
-        var addressHandler = _addressHandlers.GetOrAdd(subnet.TenantName, new FileOverlayNetworkAddressHandler(storePath, subnet));
+        var addressHandler = _addressHandlers.GetOrAdd(subnet.TenantName, new FileOverlayNetworkAddressHandler(subnet.TenantName, subnet, _dbClient));
 
         (var foundAddress, var address) = addressHandler.FindNewAddress();
         _logger.LogInformation($"{nameof(FindAndAssignNewAddressAsync)}: {nameof(foundAddress)}: {foundAddress}, tenantName: {subnet.TenantName}");
@@ -50,8 +51,7 @@ public  class FileOverlayNetworkAddressStore
     public async Task<bool> DeletePeerAsync(Subnet subnet, int[] address, string token)
     {
         _logger.LogInformation($"{nameof(DeletePeerAsync)}: Deleting an address, address: {JsonSerializer.Serialize(address)}, tenantName: {subnet.TenantName}");
-        var storePath = Path.Combine(Directory.GetCurrentDirectory(), "WireguardDb", subnet.TenantName);
-        var addressHandler = _addressHandlers.GetOrAdd(subnet.TenantName, new FileOverlayNetworkAddressHandler(storePath, subnet));
+        var addressHandler = _addressHandlers.GetOrAdd(subnet.TenantName, new FileOverlayNetworkAddressHandler(subnet.TenantName, subnet, _dbClient));
 
         var peer = await addressHandler.GetPeerAsync(address);
         if (peer?.Token != token)
@@ -68,4 +68,5 @@ public  class FileOverlayNetworkAddressStore
 
     private ConcurrentDictionary<string, FileOverlayNetworkAddressHandler> _addressHandlers;
     private readonly ILogger _logger;
+    private readonly IDbClient _dbClient;
 }

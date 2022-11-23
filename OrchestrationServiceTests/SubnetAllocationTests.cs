@@ -4,6 +4,7 @@ using OrchestrationService.Contracts;
 using OrchestrationService.Logger;
 using OrchestrationService.OverlayNetworkStore;
 using OrchestrationService.OverlayNetworkStore.Exceptions;
+using OrchestrationService.OverlayNetworkStore.DbClient;
 using Xunit.Sdk;
 
 namespace OrchestrationServiceTests;
@@ -19,6 +20,7 @@ public class SubnetAllocationTests
             config.AddConsole();
         });
         OverlayNetworkLoggerProvider.Init(loggerFactory);
+        _dbClient = _dbClient ?? new DiskDbClient();
     }
 
     [TestMethod]
@@ -30,7 +32,7 @@ public class SubnetAllocationTests
         };
 
         var subnet = new Subnet("tenant1", startingAddress, 24);
-        var store = new FileOverlayNetworkSubnetStore();
+        var store = new FileOverlayNetworkSubnetStore(_dbClient);
         var success = await store.WriteSubnetMetadataToDb(subnet);
         Assert.IsTrue(success);
 
@@ -52,7 +54,7 @@ public class SubnetAllocationTests
         };
 
         var subnet = new Subnet("tenant1", startingAddress, 24);
-        var store = new FileOverlayNetworkSubnetStore();
+        var store = new FileOverlayNetworkSubnetStore(_dbClient);
         var success = await store.WriteSubnetMetadataToDb(subnet);
         Assert.IsTrue(success);
         var exceptionEncountered = false;
@@ -74,4 +76,6 @@ public class SubnetAllocationTests
         var dbPath = Path.Combine(Directory.GetCurrentDirectory(), "WireguardDb");
         Directory.Delete(dbPath, true);
     }
+
+    private IDbClient _dbClient;
 }

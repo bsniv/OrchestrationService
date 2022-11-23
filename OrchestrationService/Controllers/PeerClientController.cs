@@ -14,7 +14,7 @@ public class PeerClientController : ControllerBase
     public PeerClientController(ILogger<PeerClientController> logger)
     {
         _logger = logger;
-        _overlayNetworkStore = FileOverlayNetworkStoreFactory.GetOrCreateStore();
+        _overlayNetworkStore = FileOverlayNetworkStoreFactory.GetOrCreateDiskStore();
     }
 
     [HttpPost(Name = "OnboardNewPeerClient")]
